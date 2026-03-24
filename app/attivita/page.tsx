@@ -54,7 +54,7 @@ export default async function AttivitaPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {activities.map((activity) => (
+                  {activities.map((activity: any) => (
                     <tr key={activity.id.toString()}>
                       <td>{activity.activityName}</td>
                       <td>{activity.isActive ? "Attiva" : "Non attiva"}</td>
