@@ -22,9 +22,13 @@ await requireAdmin();
 }
 
 export default async function AttivitaPage() {
-  const activities = await prisma.activityType.findMany({
-    orderBy: { activityName: "asc" },
-  });
+ const activities: {
+  id: bigint;
+  activityName: string;
+  isActive: boolean;
+}[] = await prisma.activityType.findMany({
+  orderBy: { activityName: "asc" },
+});
 
   return (
     <div className="page-stack">
@@ -54,7 +58,7 @@ export default async function AttivitaPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {activities.map((activity: any) => (
+                  {activities.map((activity) => (
                     <tr key={activity.id.toString()}>
                       <td>{activity.activityName}</td>
                       <td>{activity.isActive ? "Attiva" : "Non attiva"}</td>
