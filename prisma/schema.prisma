@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  admin
+  user
+}
+
+enum ImportType {
+  clients
+  activity_types
+  timesheets
+}
+
+enum ImportStatus {
+  pending
+  completed
+  failed
+}
+
+enum ImportRowStatus {
+  imported
+  skipped
+  error
+}
+
+model User {
+  id               BigInt           @id @default(autoincrement())
+  fullName         String           @map("full_name") @db.VarChar(150)
+  email            String           @unique @db.VarChar(150)
+  passwordHash     String           @map("password_hash") @db.VarChar(255)
+  role             UserRole         @default(user)
+  isActive         Boolean          @default(true) @map("is_active")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  timesheetEntries TimesheetEntry[] @relation("TimesheetUser")
+  createdEntries   TimesheetEntry[] @relation("TimesheetCreatedBy")
+  imports          Import[]
+
+  @@index([fullName], map: "idx_users_full_name")
+  @@index([isActive], map: "idx_users_is_active")
+  @@map("users")
+}
+
+model Client {
+  id               BigInt           @id @default(autoincrement())
+  clientName       String           @map("client_name") @db.VarChar(255)
+  isActive         Boolean          @default(true) @map("is_active")
+  importSource     String?          @map("import_source") @db.VarChar(100)
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  timesheetEntries TimesheetEntry[]
+
+  @@index([clientName], map: "idx_clients_name")
+  @@index([isActive], map: "idx_clients_active")
+  @@map("clients")
+}
+
+model ActivityType {
+  id               BigInt           @id @default(autoincrement())
+  activityName     String           @map("activity_name") @db.VarChar(255)
+  isActive         Boolean          @default(true) @map("is_active")
+  importSource     String?          @map("import_source") @db.VarChar(100)
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  timesheetEntries TimesheetEntry[]
+
+  @@index([activityName], map: "idx_activity_types_name")
+  @@index([isActive], map: "idx_activity_types_active")
+  @@map("activity_types")
+}
+
+model TimesheetEntry {
+  id                  BigInt       @id @default(autoincrement())
+  userId              BigInt       @map("user_id")
+  entryDate           DateTime     @map("entry_date") @db.Date
+  clientId            BigInt       @map("client_id")
+  activityTypeId      BigInt       @map("activity_type_id")
+  description         String?
+  startTime           DateTime     @map("start_time") @db.Time(0)
+  endTime             DateTime     @map("end_time") @db.Time(0)
+  durationMinutes     Int          @map("duration_minutes")
+  isBillable          Boolean      @default(false) @map("is_billable")
+  anticipatedExpenses Decimal      @default(0.00) @map("anticipated_expenses") @db.Decimal(12, 2)
+  feeAmount           Decimal      @default(0.00) @map("fee_amount") @db.Decimal(12, 2)
+  notes               String?
+  createdBy           BigInt?      @map("created_by")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+  deletedAt           DateTime?    @map("deleted_at")
+
+  user          User         @relation("TimesheetUser", fields: [userId], references: [id])
+  client        Client       @relation(fields: [clientId], references: [id])
+  activityType  ActivityType @relation(fields: [activityTypeId], references: [id])
+  createdByUser User?        @relation("TimesheetCreatedBy", fields: [createdBy], references: [id])
+
+  @@index([userId, entryDate], map: "idx_timesheet_user_date")
+  @@index([clientId, entryDate], map: "idx_timesheet_client_date")
+  @@index([activityTypeId, entryDate], map: "idx_timesheet_activity_date")
+  @@index([isBillable], map: "idx_timesheet_billable")
+  @@index([entryDate], map: "idx_timesheet_entry_date")
+  @@index([deletedAt], map: "idx_timesheet_deleted_at")
+  @@map("timesheet_entries")
+}
+
+model Import {
+  id           BigInt          @id @default(autoincrement())
+  importType   ImportType      @map("import_type")
+  fileName     String          @map("file_name") @db.VarChar(255)
+  importedBy   BigInt          @map("imported_by")
+  rowsTotal    Int             @default(0) @map("rows_total")
+  rowsImported Int             @default(0) @map("rows_imported")
+  rowsSkipped  Int             @default(0) @map("rows_skipped")
+  status       ImportStatus    @default(pending)
+  logText      String?         @map("log_text")
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  user    User            @relation(fields: [importedBy], references: [id])
+  rowsLog ImportRowsLog[]
+
+  @@index([importType], map: "idx_imports_type")
+  @@index([status], map: "idx_imports_status")
+  @@index([createdAt], map: "idx_imports_created_at")
+  @@map("imports")
+}
+
+model ImportRowsLog {
+  id           BigInt          @id @default(autoincrement())
+  importId     BigInt          @map("import_id")
+  rowNumber    Int             @map("row_number")
+  rowPayload   Json?           @map("row_payload")
+  status       ImportRowStatus
+  errorMessage String?         @map("error_message")
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  import Import @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@index([importId], map: "idx_import_rows_import_id")
+  @@index([status], map: "idx_import_rows_status")
+  @@map("import_rows_log")
+}
